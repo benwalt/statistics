@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Normal Distribution Probability Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.22.20/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const NormalDistribution = () => {
+            const [a, setA] = React.useState(-4);
+            const [b, setB] = React.useState(4);
+
+            const normalPDF = (x) => {
+                return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+            };
+
+            const normalCDF = (x) => {
+                return 0.5 * (1 + erf(x / Math.sqrt(2)));
+            };
+
+            const erf = (x) => {
+                const sign = x >= 0 ? 1 : -1;
+                x = Math.abs(x);
+                const a1 =  0.254829592;
+                const a2 = -0.284496736;
+                const a3 =  1.421413741;
+                const a4 = -1.453152027;
+                const a5 =  1.061405429;
+                const p  =  0.3275911;
+                const t = 1 / (1 + p * x);
+                const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+                return sign * y;
+            };
+
+            const generatePoints = () => {
+                const points = [];
+                for (let x = -4; x <= 4; x += 0.08) {
+                    points.push({ x, y: normalPDF(x) });
+                }
+                return points;
+            };
+
+            const points = generatePoints();
+
+            const calculateProbability = () => {
+                if (a === b) return 0;
+                if ((a === -4 && b === 4) || (a === 4 && b === -4)) return 1;
+                if (Math.abs(a - b) === 4) return 0.5;
+                if (a === -4) return normalCDF(b);
+                if (a ===  4) return 1 - normalCDF(b);
+                if (b ===  4) return 1 - normalCDF(a);
+                if (b === -4) return normalCDF(a);
+                return Math.abs(normalCDF(b) - normalCDF(a));
+            };
+
+            const probability = calculateProbability();
+
+            const getProbabilityStatement = () => {
+                if ((a === -4 && b === -4) || (a === 4 && b === 4)) return "P(∅)";
+                if ((a === -4 && b === 4) || (a === 4 && b === -4)) return "P(Z)";
+                if (a === b) return `P(Z = ${a.toFixed(2)})`;
+                if (a === -4) return `P(Z ≤ ${b.toFixed(2)})`;
+                if (b === -4) return `P(Z ≤ ${a.toFixed(2)})`;
+                if (a === 4) return `P(Z ≥ ${b.toFixed(2)})`;
+                if (b === 4) return `P(Z ≥ ${a.toFixed(2)})`;
+                return `P(${Math.min(a, b).toFixed(2)} ≤ Z ≤ ${Math.max(a, b).toFixed(2)})`;
+            };
+
+            const formatProbability = (prob) => {
+                return ((prob === 0) || (prob === 1)) ? prob.toFixed(0) : 
+                        (prob === 0.5) ? prob.toFixed(1) : prob.toFixed(6);
+            };
+
+            return (
+                <div className="p-4 max-w-3xl mx-auto">
+                    <h1 className="text-2xl font-bold mb-4">Standard Normal Distribution Probabilities</h1>
+                    <svg viewBox="0 0 800 300" className="w-full h-64 bg-white border">
+                        <line x1="0" y1="250" x2="800" y2="250" stroke="black" />
+                        <line x1="400" y1="0" x2="400" y2="300" stroke="black" />
+                        
+                        <path
+                            d={`M ${points.map(p => `${p.x * 100 + 400},${250 - p.y * 555.5}`).join(' L ')}`}
+                            fill="none"
+                            stroke="blue"
+                            strokeWidth="2"
+                        />
+                        
+                        <path
+                            d={`
+                                M ${Math.max(0, Math.min(a, b) * 100 + 400)},250
+                                L ${points.filter(p => p.x >= Math.max(-4, Math.min(a, b)) && p.x <= Math.min(4, Math.max(a, b)))
+                                         .map(p => `${p.x * 100 + 400},${250 - p.y * 555.5}`)
+                                         .join(' L ')}
+                                L ${Math.min(800, Math.max(a, b) * 100 + 400)},250
+                                Z
+                            `}
+                            fill="lightblue"
+                            fillOpacity="0.5"
+                        />
+                        
+                        {a !== -4 && a !== 4 && (
+                            <line x1={a * 100 + 400} y1="0" x2={a * 100 + 400} y2="300" stroke="red" strokeDasharray="5,5" />
+                        )}
+                        {b !== -4 && b !== 4 && b !== a && (
+                            <line x1={b * 100 + 400} y1="0" x2={b * 100 + 400} y2="300" stroke="red" strokeDasharray="5,5" />
+                        )}
+                        
+                        <text x="0" y="270" textAnchor="start">-4</text>
+                        <text x="100" y="270" textAnchor="middle">-3</text>
+                        <text x="200" y="270" textAnchor="middle">-2</text>
+                        <text x="300" y="270" textAnchor="middle">-1</text>
+                        <text x="400" y="270" textAnchor="middle">0</text>
+                        <text x="500" y="270" textAnchor="middle">1</text>
+                        <text x="600" y="270" textAnchor="middle">2</text>
+                        <text x="700" y="270" textAnchor="middle">3</text>
+                        <text x="800" y="270" textAnchor="end">4</text>
+                    </svg>
+
+                    <div className="mb-4">
+                        <input
+                            type="range"
+                            min="-4"
+                            max="4"
+                            step="0.01"
+                            value={a}
+                            onChange={(e) => setA(parseFloat(e.target.value))}
+                            className="w-full"
+                        />
+<br/>
+                        <input
+                            type="range"
+                            min="-4"
+                            max="4"
+                            step="0.01"
+                            value={b}
+                            onChange={(e) => setB(parseFloat(e.target.value))}
+                            className="w-full"
+                        />
+                    </div>
+                     
+                    <p className="mt-6 text-center text-xl font-bold">
+                        {getProbabilityStatement()} = {formatProbability(probability)}
+                    </p>
+                    
+                    <hr className="mt-6 mb-2" />
+                    <p className="text-right italic">by Dr. B.Walter and Claude.ai</p>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<NormalDistribution />, document.getElementById('root'));
+    </script>
+</body>
+</html>
