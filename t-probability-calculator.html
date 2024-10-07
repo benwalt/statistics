@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>T-Distribution Probability Calculator</title>
+  <!-- Include React and ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- Include Babel for JSX transformation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Include Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Include jStat library -->
+  <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
+  <!-- Custom styles -->
+  <style>
+    .text-shadow {
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const TDistributionCalculator = () => {
+      const [type, setType] = useState("|T| ≤ ");
+      const [degreesOfFreedom, setDegreesOfFreedom] = useState(10);
+      const [quantile, setQuantile] = useState("1.81");
+      const [probability, setProbability] = useState("0.90");
+      const canvasRef = useRef(null);
+
+      // Statistical functions using jStat
+      const tPDF = (x, df) => jStat.studentt.pdf(x, df);
+      const tCDF = (x, df) => jStat.studentt.cdf(x, df);
+      const inverseTCDF = (p, df) => jStat.studentt.inv(p, df);
+
+      const calculateProbability = (q, df, selectedType) => {
+        switch (selectedType) {
+          case "|T| ≥ ": return 2 * (1 - tCDF(q, df));
+          case "|T| ≤ ": return 2 * tCDF(q, df) - 1;
+          case " T  ≥ ": return 1 - tCDF(q, df);
+          case " T  ≤ ": return tCDF(q, df);
+          default: return 0;
+        }
+      };
+
+      const calculateQuantile = (p, df, selectedType) => {
+        try {
+          switch (selectedType) {
+            case "|T| ≥ ": return inverseTCDF(1 - p / 2, df);
+            case "|T| ≤ ": return inverseTCDF((p + 1) / 2, df);
+            case " T  ≥ ": return inverseTCDF(1 - p, df);
+            case " T  ≤ ": return inverseTCDF(p, df);
+            default: return 0;
+          }
+        } catch (error) {
+          alert("Error calculating quantile: " + error.message);
+          return 0;
+        }
+      };
+
+      const handleTypeChange = e => {
+        const newType = e.target.value;
+        let newQuantile = parseFloat(quantile);
+        if ((newType === "|T| ≤ " || newType === "|T| ≥ ") && newQuantile < 0) {
+          newQuantile = Math.abs(newQuantile);
+          setQuantile(newQuantile.toFixed(2));
+        }
+        setType(newType);
+        setProbability(calculateProbability(newQuantile, degreesOfFreedom, newType).toFixed(3));
+      };
+
+      const handleDFChange = e => {
+        const input = e.target.value;
+        if (input === "" || isNaN(parseInt(input)) || parseInt(input) <= 0) {
+          setDegreesOfFreedom("");
+          return;
+        }
+        const df = parseInt(input);
+        setDegreesOfFreedom(df);
+        setQuantile(calculateQuantile(parseFloat(probability), df, type).toFixed(2));
+      };
+
+      const handleQuantileChange = e => {
+        const input = e.target.value;
+        setQuantile(input);
+        if (input === "" || isNaN(parseFloat(input))) return;
+        let newQuantile = parseFloat(input);
+        setProbability(calculateProbability(newQuantile, degreesOfFreedom, type).toFixed(3));
+      };
+
+      const handleProbabilityChange = e => {
+        const input = e.target.value;
+        setProbability(input);
+        if (input === "" || isNaN(parseFloat(input))) return;
+        const newProbability = parseFloat(input);
+        const adjustedProbability = Math.max(0.001, Math.min(0.999, newProbability));
+        setQuantile(calculateQuantile(adjustedProbability, degreesOfFreedom, type).toFixed(2));
+      };
+
+      const handleQuantileBlur = () => {
+        if (quantile === "" || isNaN(parseFloat(quantile))) {
+          setQuantile("0.00");
+          setProbability(calculateProbability(0, degreesOfFreedom, type).toFixed(3));
+        } else {
+          let newQuantile = parseFloat(quantile);
+          setQuantile(newQuantile.toFixed(2));
+          setProbability(calculateProbability(newQuantile, degreesOfFreedom, type).toFixed(3));
+        }
+      };
+
+      const handleProbabilityBlur = () => {
+        if (probability === "" || isNaN(parseFloat(probability))) {
+          setProbability("0.500");
+          setQuantile(calculateQuantile(0.5, degreesOfFreedom, type).toFixed(2));
+        } else {
+          const newProbability = parseFloat(probability);
+          const adjustedProbability = Math.max(0.001, Math.min(0.999, newProbability));
+          setProbability(adjustedProbability.toFixed(3));
+          setQuantile(calculateQuantile(adjustedProbability, degreesOfFreedom, type).toFixed(2));
+        }
+      };
+
+      const handleDFBlur = () => {
+        if (degreesOfFreedom === "" || isNaN(parseInt(degreesOfFreedom)) || parseInt(degreesOfFreedom) <= 0) {
+          setDegreesOfFreedom(1);
+          setQuantile(calculateQuantile(parseFloat(probability), 1, type).toFixed(2));
+        } else {
+          const df = parseInt(degreesOfFreedom);
+          setDegreesOfFreedom(df);
+          setQuantile(calculateQuantile(parseFloat(probability), df, type).toFixed(2));
+        }
+      };
+
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.clearRect(0, 0, width, height);
+
+        // Set X-axis limits based on degrees of freedom
+        let xMin, xMax;
+        if (degreesOfFreedom >= 10) {
+          xMin = -4; xMax = 4;
+        } else if (degreesOfFreedom >= 5) {
+          xMin = -5; xMax = 5;
+        } else if (degreesOfFreedom === 4) {
+          xMin = -6; xMax = 6;
+        } else if (degreesOfFreedom === 3) {
+          xMin = -10; xMax = 10;
+        } else if (degreesOfFreedom === 2) {
+          xMin = -15; xMax = 15;
+        } else {
+          xMin = -15; xMax = 15; // Default case
+        }
+        const xRange = xMax - xMin;
+
+        // Set Y-axis maximum
+        const maxPDF = 0.5; // Fixed to 0.5 as per original code
+
+        // Draw axes
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, height - 20);
+        ctx.lineTo(width, height - 20);
+        ctx.moveTo(40, 0);
+        ctx.lineTo(40, height);
+        ctx.stroke();
+
+        // X-axis labels
+        ctx.fillStyle = 'black';
+        ctx.textAlign = 'center';
+        ctx.font = '12px Arial';
+        const xTickInterval = xRange / 8;
+        for (let i = 0; i <= 8; i++) {
+          const xValue = xMin + i * xTickInterval;
+          const canvasX = i * width / 8;
+          ctx.fillText(xValue.toFixed(0), canvasX, height - 5);
+        }
+
+        // Y-axis labels
+        ctx.textAlign = 'right';
+        for (let i = 0; i <= 5; i++) {
+          const yValue = (i * maxPDF / 5).toFixed(2);
+          const y = height - (i * height / 6) - 20;
+          ctx.fillText(yValue, 35, y + 3);
+        }
+
+        const q = parseFloat(quantile);
+        const canvasQ = (q - xMin) * width / xRange;
+        const canvasNegQ = (-q - xMin) * width / xRange;
+
+        // Shaded area
+        ctx.fillStyle = '#ff9999';
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        if (type === "|T| ≥ ") {
+          // Left tail
+          ctx.moveTo(0, height - 20);
+          for (let x = xMin; x <= -q; x += xRange / width) {
+            const y = tPDF(x, degreesOfFreedom);
+            const canvasX = (x - xMin) * width / xRange;
+            const canvasY = height - (y * height / maxPDF) - 20;
+            ctx.lineTo(canvasX, canvasY);
+          }
+          ctx.lineTo(canvasNegQ, height - 20);
+          ctx.closePath();
+          ctx.fill();
+          // Right tail
+          ctx.beginPath();
+          ctx.moveTo(canvasQ, height - 20);
+          for (let x = q; x <= xMax; x += xRange / width) {
+            const y = tPDF(x, degreesOfFreedom);
+            const canvasX = (x - xMin) * width / xRange;
+            const canvasY = height - (y * height / maxPDF) - 20;
+            ctx.lineTo(canvasX, canvasY);
+          }
+          ctx.lineTo(width, height - 20);
+        } else if (type === " T  ≥ ") {
+          ctx.moveTo(canvasQ, height - 20);
+          for (let x = q; x <= xMax; x += xRange / width) {
+            const y = tPDF(x, degreesOfFreedom);
+            const canvasX = (x - xMin) * width / xRange;
+            const canvasY = height - (y * height / maxPDF) - 20;
+            ctx.lineTo(canvasX, canvasY);
+          }
+          ctx.lineTo(width, height - 20);
+        } else if (type === " T  ≤ ") {
+          ctx.moveTo(0, height - 20);
+          for (let x = xMin; x <= q; x += xRange / width) {
+            const y = tPDF(x, degreesOfFreedom);
+            const canvasX = (x - xMin) * width / xRange;
+            const canvasY = height - (y * height / maxPDF) - 20;
+            ctx.lineTo(canvasX, canvasY);
+          }
+          ctx.lineTo(canvasQ, height - 20);
+        } else if (type === "|T| ≤ ") {
+          ctx.moveTo(canvasNegQ, height - 20);
+          for (let x = -q; x <= q; x += xRange / width) {
+            const y = tPDF(x, degreesOfFreedom);
+            const canvasX = (x - xMin) * width / xRange;
+            const canvasY = height - (y * height / maxPDF) - 20;
+            ctx.lineTo(canvasX, canvasY);
+          }
+          ctx.lineTo(canvasQ, height - 20);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Vertical lines at quantiles
+        ctx.strokeStyle = '#0000FF';
+        ctx.globalAlpha = 1.0;
+        ctx.lineWidth = 3;
+        if (type === "|T| ≥ " || type === "|T| ≤ ") {
+          ctx.beginPath();
+          ctx.moveTo(canvasQ, height - 20);
+          ctx.lineTo(canvasQ, 0);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(canvasNegQ, height - 20);
+          ctx.lineTo(canvasNegQ, 0);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(canvasQ, height - 20);
+          ctx.lineTo(canvasQ, 0);
+          ctx.stroke();
+        }
+
+        // Plot the PDF
+        ctx.beginPath();
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
+        for (let x = xMin; x <= xMax; x += xRange / width) {
+          const y = tPDF(x, degreesOfFreedom);
+          const canvasX = (x - xMin) * width / xRange;
+          const canvasY = height - (y * height / maxPDF) - 20;
+          x === xMin ? ctx.moveTo(canvasX, canvasY) : ctx.lineTo(canvasX, canvasY);
+        }
+        ctx.stroke();
+      }, [type, quantile, probability, degreesOfFreedom]);
+
+      return (
+        <div className="p-4">
+          <h1 className="text-2xl font-bold text-center mb-5 text-shadow">T-Distribution Quantiles and Probabilities</h1>
+          <div className="flex items-center justify-center mb-4">
+            <label className="mr-2 text-lg font-bold">Degrees of freedom:</label>
+            <input
+              type="number"
+              value={degreesOfFreedom}
+              onChange={handleDFChange}
+              onBlur={handleDFBlur}
+              min="1"
+              step="1"
+              title="Enter degrees of freedom (positive integer)."
+              className="w-24 p-1 border border-gray-300 rounded bg-yellow-100 text-lg"
+            />
+          </div>
+          <div className="text-xl font-bold mb-5 flex items-center justify-center">
+            P(
+            <select value={type} onChange={handleTypeChange} className="mx-1 p-1 border border-gray-300 rounded text-lg">
+              <option value="|T| ≥ ">|T| ≥ </option>
+              <option value="|T| ≤ ">|T| ≤ </option>
+              <option value=" T  ≥ "> T  ≥ </option>
+              <option value=" T  ≤ "> T  ≤ </option>
+            </select>
+            <input
+              type="number"
+              value={quantile}
+              onChange={handleQuantileChange}
+              onBlur={handleQuantileBlur}
+              step="0.01"
+              title="Enter a quantile value."
+              className="w-20 mx-1 p-1 border border-gray-300 rounded bg-blue-100 text-lg"
+            />
+            ) =
+            <input
+              type="number"
+              value={probability}
+              onChange={handleProbabilityChange}
+              onBlur={handleProbabilityBlur}
+              min="0.001"
+              max="0.999"
+              step="0.001"
+              title="Enter a probability value (0.001 to 0.999)."
+              className="w-24 mx-1 p-1 border border-gray-300 rounded bg-red-100 text-lg"
+            />
+          </div>
+          <canvas ref={canvasRef} width="800" height="300" className="border border-gray-300" />
+          <hr className="mt-5" />
+          <p className="text-right italic">by Dr. B.Walter and ChatGPT</p>
+        </div>
+      );
+    };
+
+    // Render the component
+    ReactDOM.render(<TDistributionCalculator />, document.getElementById('root'));
+  </script>
+</body>
+</html>
