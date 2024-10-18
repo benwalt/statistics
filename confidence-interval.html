@@ -178,7 +178,7 @@ Shading changes to red if the confidence interval does not contain the true mean
                     y: bluePDF,
                     type: 'scatter',
                     mode: 'lines',
-                    line: { color: 'blue', width: 2 },
+                    line: { color: linecolor, width: 2 },
                     name: 'Estimated sample mean distribution'
                 },
                 // Shaded area
@@ -225,7 +225,7 @@ Shading changes to red if the confidence interval does not contain the true mean
                     y: [0, jStat.normal.pdf(mean, mean, s / Math.sqrt(n))],
                     type: 'scatter',
                     mode: 'lines',
-                    line: { color: 'blue', width: 2 },
+                    line: { color: linecolor, width: 2 },
                     showlegend: false,
                 }
             ];
