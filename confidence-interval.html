@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Confidence Interval Visualizer</title>
+    <title>Normal Confidence Interval Visualizer</title>
+    <!-- Include Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Include Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <!-- Include jStat.js -->
@@ -40,29 +42,44 @@
     </style>
 </head>
 <body>
-    <h1 style="text-align:center">Confidence Interval Visualizer</h1>
-    <div id="controls">
+    <h1 class="text-center text-2xl font-bold my-4">Normal Confidence Interval Visualizer</h1>
+    <div id="controls" class="font-bold max-w-2xl mx-auto flex flex-wrap justify-center items-center space-x-4 space-y-2">
         <label>
             # samples: 
-            <input type="number" id="nInput" min="1" max="200" step="1" value="1">
+            <input type="number" id="nInput" min="1" max="200" step="1" value="1" class="bg-yellow-100 border border-gray-300 rounded px-2 py-1 w-16">
         </label> &nbsp; &nbsp;
         <label>
             Std. dev. σ: 
-            <input type="number" id="sInput" min="0.01" max="2.00" step="0.01" value="1.00">
+            <input type="number" id="sInput" min="0.01" max="2.00" step="0.01" value="1.00" class="bg-red-100 border border-gray-300 rounded px-2 py-1 w-16">
         </label>
         <label> &nbsp; &nbsp;
             Confidence level:
-            <input type="number" id="alphaInput" min="0.50" max="0.99" step="0.01" value="0.95">
+            <input type="number" id="alphaInput" min="0.50" max="0.99" step="0.01" value="0.95" class="bg-blue-100 border border-gray-300 rounded px-2 py-1 w-16">
         </label> &nbsp; &nbsp;
-        <button id="rerandomizeButton">Rerandomize</button>
+        <button id="rerandomizeButton" class="bg-gray-600 text-white px-4 py-2 rounded">Rerandomize</button>
     </div>
-    <div id="plot"></div>
-    <div id="info">
-        <span id="confidenceInterval"></span> &nbsp; &nbsp; 
-        <span id="width"></span>
+    <div id="plot" class="max-w-2xl mx-auto mb-0"></div>
+<div class="flex justify-center mb-4 mt-0 font-bold text-xl">
+    <div id="info" class="w-auto my-0 p-4 border rounded-lg bg-gray-100 inline-block">
+        <div class="flex space-x-4">
+            <span id="mean"></span>
+        </div>
+        <div class="flex space-x-4 mt-2">
+            <span id="confidenceInterval"></span>
+            <span>&nbsp;&nbsp;</span> 
+            <span id="width"></span>
+        </div>
     </div>
+</div>
+<div class="flex justify-center"><div style="width: 700px;">
+Plotted above is a visualization of the construction of a confidence interval with known standard deviation σ.  
+The visualization randomly picks numbers from normal distribution with mean 0 and std.dev. σ, computes their sample
+mean, and uses this to estimate the distribution of X̄ - which should have std. dev. σ/√​​n. Depending on the chosen
+confidence level, the appropriate middle area under the X̄ distribution is calculated and shaded.  
+The boundaries of the shaded area are the ends of the confidence interval. 
+</div></div>
 <hr>
-<div style="text-align:right; font-style:italic;">by Dr. B.Walter and ChatGPT</div>
+<p class="text-right italic mr-24 mt-1">by Dr. B.Walter and ChatGPT</p>
 
     <script>
         // Initialize variables
@@ -154,10 +171,10 @@
                     x: xShaded.concat(xShaded.slice().reverse()),
                     y: yShaded.concat(new Array(yShaded.length).fill(0)),
                     fill: 'tozeroy',
-                    fillcolor: 'rgba(0, 0, 255, 0.2)',
+                    fillcolor: 'rgba(59, 130, 246, 0.2)',
                     type: 'scatter',
                     mode: 'none',
-                    name: 'Confidence Area',
+                    name: 'Middle ' + (alpha * 100).toFixed(0) + '% of area',
                     // showlegend: false
                 },
                 // Vertical lines at a and b
@@ -186,6 +203,15 @@
                     line: { color: 'blue', width: 10 },
                     name: (alpha * 100).toFixed(0) + '% Confidence interval',
                     // showlegend: false
+                },
+                // Vertical line at mean
+                {
+                    x: [mean, mean],
+                    y: [0, jStat.normal.pdf(mean, mean, s / Math.sqrt(n))],
+                    type: 'scatter',
+                    mode: 'lines',
+                    line: { color: 'blue', width: 2 },
+                    showlegend: false,
                 }
             ];
 
@@ -202,8 +228,10 @@
 
         // Update informational output
         function updateInfo() {
+            document.getElementById('mean').innerHTML = 
+                'Sample mean is ' + mean.toFixed(2);
             document.getElementById('confidenceInterval').innerHTML = 
-                alpha.toFixed(2)*100 + '% confidence interval is (' + a.toFixed(3) + ', ' + b.toFixed(3) + ')';
+                (alpha * 100).toFixed(0) + '% confidence interval is (' + a.toFixed(3) + ', ' + b.toFixed(3) + ')';
             document.getElementById('width').innerHTML = 
                 'Width of CI is ' + width.toFixed(3);
         }
