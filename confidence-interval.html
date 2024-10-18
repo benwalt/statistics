@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Normal Confidence Interval Visualization</title>
+    <title>Normal Confidence Interval Visualizer</title>
     <!-- Include Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Include Plotly.js -->
@@ -42,7 +42,7 @@
     </style>
 </head>
 <body>
-    <h1 class="text-center text-2xl font-bold my-4">Normal Confidence Interval Visualizer</h1>
+    <h1 class="text-center text-2xl font-bold my-4">Normal Confidence Interval Visualization</h1>
     <div id="controls" class="font-bold max-w-2xl mx-auto flex flex-wrap justify-center items-center space-x-4 space-y-2">
         <label>
             # samples: 
@@ -71,12 +71,13 @@
         </div>
     </div>
 </div>
-<div class="flex justify-center"><div style="width: 700px;">
-Plotted above is a visualization of the construction of a confidence interval with known standard deviation σ.  
-The visualization randomly picks numbers from normal distribution with mean 0 and std.dev. σ, computes their sample
-mean, and uses this to estimate the distribution of X̄ - which should have std. dev. σ/√​​n. Depending on the chosen
-confidence level, the appropriate middle area under the X̄ distribution is calculated and shaded.  
-The boundaries of the shaded area are the ends of the confidence interval. 
+<div class="flex justify-center"><div style="width: 700px;">  
+This visualization randomly picks numbers from normal distribution with mean 0 and given standard deviation.
+Then it computes their sample mean and uses this to estimate the distribution of X̄ - which has standard deviation σ/√​​n. <br/>
+Depending on the chosen
+confidence level, the appropriate central area under the X̄ distribution is calculated and shaded.  
+This gives the confidence interval. <br/>
+Shading changes to red if the confidence interval does not contain the true mean.
 </div></div>
 <hr>
 <p class="text-right italic mr-24 mt-1">by Dr. B.Walter and ChatGPT</p>
@@ -93,6 +94,8 @@ The boundaries of the shaded area are the ends of the confidence interval.
         let width = 0;
         let zA = 0;
         let zB = 0;
+        let fillcolor = 'rgba(59, 130, 246, 0.2)'; // blue
+        let linecolor = 'blue'; 
 
         // Generate initial random data
         function generateRandomData() {
@@ -112,7 +115,7 @@ The boundaries of the shaded area are the ends of the confidence interval.
             mean = sum / n;
         }
 
-        // Compute z-values and a, b
+        // Compute z-values and a, b, set width and colors
         function computeZValues() {
             zA = jStat.normal.inv((1 - alpha) / 2, 0, 1);
             zB = jStat.normal.inv((1 + alpha) / 2, 0, 1);
@@ -120,6 +123,18 @@ The boundaries of the shaded area are the ends of the confidence interval.
             a = mean + zA * sd;
             b = mean + zB * sd;
             width = b - a;
+
+            // Determine fill color based on whether 0 is in (a, b)
+            if (a <= 0 && 0 <= b) {
+                // 0 is inside the confidence interval
+                fillcolor = 'rgba(59, 130, 246, 0.2)'; // blue
+                linecolor = 'blue';
+            } else {
+                // 0 is outside the confidence interval
+                fillcolor = 'rgba(220, 38, 38, 0.2)'; // red
+                linecolor = 'red';
+            }
+
         }
 
         // Generate plot
@@ -171,7 +186,7 @@ The boundaries of the shaded area are the ends of the confidence interval.
                     x: xShaded.concat(xShaded.slice().reverse()),
                     y: yShaded.concat(new Array(yShaded.length).fill(0)),
                     fill: 'tozeroy',
-                    fillcolor: 'rgba(59, 130, 246, 0.2)',
+                    fillcolor: fillcolor,
                     type: 'scatter',
                     mode: 'none',
                     name: 'Middle ' + (alpha * 100).toFixed(0) + '% of area',
@@ -183,7 +198,7 @@ The boundaries of the shaded area are the ends of the confidence interval.
                     y: [0, jStat.normal.pdf(a, mean, s / Math.sqrt(n))],
                     type: 'scatter',
                     mode: 'lines',
-                    line: { color: 'blue', width: 2, dash: 'dot' },
+                    line: { color: linecolor, width: 2, dash: 'dot' },
                     showlegend: false
                 },
                 {
@@ -191,7 +206,7 @@ The boundaries of the shaded area are the ends of the confidence interval.
                     y: [0, jStat.normal.pdf(b, mean, s / Math.sqrt(n))],
                     type: 'scatter',
                     mode: 'lines',
-                    line: { color: 'blue', width: 2, dash: 'dot' },
+                    line: { color: linecolor, width: 2, dash: 'dot' },
                     showlegend: false
                 },
                 // Thick blue line along x-axis from a to b
@@ -200,7 +215,7 @@ The boundaries of the shaded area are the ends of the confidence interval.
                     y: [0.001, 0.001],
                     type: 'scatter',
                     mode: 'lines',
-                    line: { color: 'blue', width: 10 },
+                    line: { color: linecolor, width: 10 },
                     name: (alpha * 100).toFixed(0) + '% Confidence interval',
                     // showlegend: false
                 },
@@ -229,7 +244,7 @@ The boundaries of the shaded area are the ends of the confidence interval.
         // Update informational output
         function updateInfo() {
             document.getElementById('mean').innerHTML = 
-                'Sample mean is ' + mean.toFixed(2);
+                'Sampled ' + n.toFixed(0) + ' values with sample mean ' + mean.toFixed(2);
             document.getElementById('confidenceInterval').innerHTML = 
                 (alpha * 100).toFixed(0) + '% confidence interval is (' + a.toFixed(3) + ', ' + b.toFixed(3) + ')';
             document.getElementById('width').innerHTML = 
