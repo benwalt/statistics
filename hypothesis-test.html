@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Two-Tailed Hypothesis Testing Visualization</title>
+  <!-- Include Tailwind CSS from CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <!-- React component will be mounted here -->
+  <div id="root"></div>
+
+  <!-- Include React and ReactDOM from CDN -->
+  <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+
+  <!-- Include Babel for JSX transpiling in the browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Include Plotly.js from CDN -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+  <!-- Include jStat from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
+
+  <!-- Your React component -->
+  <script type="text/babel">
+
+    function HypothesisTestVisualization() {
+      const { useState, useEffect, useRef } = React;
+
+      // State variables
+      const [n, setN] = useState(1);
+      const [sigma, setSigma] = useState(1.0);
+      const [mean, setMean] = useState(0);
+      const [mu, setMu] = useState(1.0);
+      const [alpha, setAlpha] = useState(0.05);
+
+      const [err, setErr] = useState(0);
+      const [a, setA] = useState(0);
+      const [b, setB] = useState(0);
+      const [pval, setPval] = useState(0);
+      const [power, setPower] = useState(0);
+
+
+      const plotRef = useRef(null);
+
+      // Clamp mu between mean - 3 and mean + 3
+      useEffect(() => {
+        const minMu = mean - 3.0;
+        const maxMu = mean + 3.0;
+        if (mu < minMu) setMu(minMu);
+        if (mu > maxMu) setMu(maxMu);
+      }, [mean, mu]);
+
+      useEffect(() => {
+        // Compute err, a, b, pval, power
+        const standardError = sigma / Math.sqrt(n);
+        const zAlpha = Math.abs(jStat.normal.inv(alpha / 2, 0, 1));
+        const errCalc = zAlpha * standardError;
+        const aCalc = mean - errCalc;
+        const bCalc = mean + errCalc;
+        const testStatistic = (mu - mean) / standardError;
+        const pvalCalc = jStat.normal.cdf(-Math.abs(testStatistic), 0, 1) * 2;
+
+        // Compute power
+        const z1 = (aCalc - mu) / standardError;
+        const z2 = (bCalc - mu) / standardError;
+        const beta = jStat.normal.cdf(z2,0,1) - jStat.normal.cdf(z1,0,1);
+        const powerCalc = 1 - beta;
+
+        setErr(errCalc);
+        setA(aCalc);
+        setB(bCalc);
+        setPval(pvalCalc);
+        setPower(powerCalc);
+      }, [n, sigma, mean, mu, alpha]);
+
+      // Generate data for plotting
+      const generatePlotData = () => {
+        const standardError = sigma / Math.sqrt(n);
+        const xMin = Math.min(mean - 4 * standardError, mu - 4 * standardError, a - 1, b - 1);
+        const xMax = Math.max(mean + 4 * standardError, mu + 4 * standardError, a + 1, b + 1);
+        const xValues = [];
+        const numPoints = 500;
+        const step = (xMax - xMin) / numPoints;
+        for (let i = 0; i <= numPoints; i++) {
+          xValues.push(xMin + i * step);
+        }
+
+        const nullPdfY = xValues.map((x) => jStat.normal.pdf(x, mean, standardError));
+        const truePdfY = xValues.map((x) => jStat.normal.pdf(x, mu, standardError));
+
+        return {
+          xValues,
+          nullPdfY,
+          truePdfY,
+        };
+      };
+
+      const plotData = generatePlotData();
+
+      const yMax = Math.max(...plotData.nullPdfY, ...plotData.truePdfY);
+
+
+      // Create traces for Plotly
+      const traces = [
+        // Null Hypothesis
+        {
+          x: plotData.xValues,
+          y: plotData.nullPdfY,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Null Hypothesis',
+          line: { color: 'blue', width: 3 },
+        },
+        // True Distribution
+        {
+          x: plotData.xValues,
+          y: plotData.truePdfY,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'True Distribution',
+          line: { color: 'red', width: 3},
+        },
+        // Null Mean Line
+        {
+          x: [mean, mean],
+          y: [0, jStat.normal.pdf(mean, mean, sigma / Math.sqrt(n))],
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Null Mean',
+          line: { color: 'blue', width: 2, dash: 'dot' },
+          showlegend: false,
+        },
+        // Cutoff Lines
+        {
+          x: [a, a],
+          y: [0, jStat.normal.pdf(a, mean, sigma / Math.sqrt(n))],
+          type: 'scatter',
+          mode: 'lines',
+          line: { color: 'blue', width: 1, dash: 'dot' },
+          showlegend: false,
+        },
+        {
+          x: [b, b],
+          y: [0, jStat.normal.pdf(b, mean, sigma / Math.sqrt(n))],
+          type: 'scatter',
+          mode: 'lines',
+          line: { color: 'blue', width: 1, dash: 'dot' },
+          showlegend: false,
+        },
+        // Type I Error Shading (Left Tail)
+        {
+          x: plotData.xValues.filter((x) => x <= a),
+          y: plotData.nullPdfY.slice(0, plotData.xValues.findIndex((x) => x > a)),
+          type: 'scatter',
+          mode: 'lines',
+          fill: 'tozeroy',
+          fillcolor: 'rgba(173, 216, 230, 0.5)',
+          line: { color: 'transparent', width: 10 },
+          name: 'Type I Error',
+          legendgroup: 'Type I Error',
+          showlegend: true,
+          hoverinfo: 'skip',
+        },
+        // Type I Error Shading (Right Tail)
+        {
+          x: plotData.xValues.filter((x) => x >= b),
+          y: plotData.nullPdfY.slice(plotData.xValues.findIndex((x) => x >= b)),
+          type: 'scatter',
+          mode: 'lines',
+          fill: 'tozeroy',
+          fillcolor: 'rgba(173, 216, 230, 0.5)',
+          line: { color: 'transparent', width: 10 },
+          name: 'Type I Error',
+          legendgroup: 'Type I Error',
+          showlegend: false, // Do not show duplicate legend entry
+          hoverinfo: 'skip',
+        },
+        // Type II Error Shading
+        {
+          x: plotData.xValues.filter((x) => x >= a && x <= b),
+          y: plotData.truePdfY.slice(
+            plotData.xValues.findIndex((x) => x >= a),
+            plotData.xValues.findIndex((x) => x >= b) + 1
+          ),
+          type: 'scatter',
+          mode: 'lines',
+          fill: 'tozeroy',
+          fillcolor: 'rgba(255, 182, 193, 0.5)',
+          line: { color: 'transparent', width: 10 },
+          name: 'Type II Error',
+          showlegend: true,
+          hoverinfo: 'skip',
+        },
+        // Fail to Reject Line
+        {
+          x: [a, b],
+          y: [0.0175 * yMax, 0.0175 * yMax],
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Fail to Reject Interval',
+          line: { color: 'blue', width: 10 },
+          showlegend: true,
+        },
+        // Confidence Interval Line
+        {
+          x: [mu - err, mu + err],
+          y: [-0.0175 * yMax, -0.0175 * yMax],
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Confidence Interval',
+          line: { color: 'red', width: 10 },
+          showlegend: true,
+        },
+      ];
+
+      const shapes = [ 
+        // True Mean Line
+        {
+          type: 'line',
+          x0: mu, x1: mu,
+          y0:  0, y1: jStat.normal.pdf(mu, mu, sigma / Math.sqrt(n)),
+          line: { color: 'red', width: 2, dash: 'dot' },
+          showlegend: false,
+          name: 'True Mean',
+          editable: true,
+        },
+      ];
+
+      const layout = {
+        // xaxis: { title: 'x' },
+        // yaxis: { title: 'Probability Density' },
+        showlegend: true,
+        // legend: { orientation: 'h', x: 0, y: -0.2 },
+        legend: { orientation: 'v', x: 1, y: 1, xanchor: 'right', yanchor: 'top' },
+        margin: { t: 20 },
+        editable: true,
+        shapes: shapes,
+      };
+
+      const extractMuFromEvent = (eventData) => {
+        for (let key in eventData) {
+          if (key.includes('shapes[0].x0') || key.includes('shapes[0].x1')) {
+            // Get the new x position
+            const newMu = eventData[key];
+            return newMu;
+          }
+        }
+        return null;
+      };
+
+      const config = {
+        displayModeBar: false, // Disable the modebar completely
+      };
+
+      useEffect(() => {
+        Plotly.newPlot(plotRef.current, traces, layout, config);
+      
+        // Event listener for shape drag
+        plotRef.current.on('plotly_relayout', (eventData) => {
+          // Check if the shape has moved
+          const updatedMu = extractMuFromEvent(eventData);
+          if (updatedMu !== null) {
+            // Clamp mu within allowed range
+            const minMu = mean - 3.0;
+            const maxMu = mean + 3.0;
+            const clampedMu = Math.max(minMu, Math.min(maxMu, updatedMu));
+            setMu(clampedMu);
+          }
+        });
+      }, [traces]);
+
+      // Update shape position when mu changes
+      useEffect(() => {
+        if (plotRef.current) {
+          Plotly.relayout(plotRef.current, {
+            'shapes[0].x0': mu,
+            'shapes[0].x1': mu,
+          });
+        }
+      }, [mu]);
+
+      return (
+        <div className="container mx-auto p-4">
+          <h1 className="text-2xl font-bold mb-4">Two-Tailed Hypothesis Testing Visualization</h1>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-2">
+            {/* Input boxes */}
+            <div>
+              <label>&nbsp; &nbsp; &nbsp; # Samples n: </label>
+              <input
+                type="number"
+                min="1"
+                max="200"
+                step="1"
+                value={n}
+                onChange={(e) => setN(Math.max(1, Math.min(200, Number(e.target.value))))}
+                className="border"
+                class="bg-yellow-100 border border-gray-300 rounded px-2 py-1 w-16"
+              />
+            </div>
+            <div>
+              <label>Significance α: </label>
+              <input
+                type="number"
+                min="0.01"
+                max="0.50"
+                step="0.01"
+                value={alpha}
+                onChange={(e) => setAlpha(Math.max(0.01, Math.min(0.50, Number(e.target.value))))}
+                className="border"
+                class="bg-blue-100 border border-gray-300 rounded px-2 py-1 w-16"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label>Standard Dev. σ: </label>
+              <input
+                type="number"
+                min="0.01"
+                max="3.00"
+                step="0.01"
+                value={sigma}
+                onChange={(e) => setSigma(Math.max(0.01, Math.min(3.0, Number(e.target.value))))}
+                className="border"
+                class="bg-yellow-100 border border-gray-300 rounded px-2 py-1 w-16"
+              />
+            </div>
+            <div>
+              <label>&nbsp;Null mean µ₀: </label>
+              <input
+                type="number"
+                min="0"
+                max="30"
+                step="1"
+                value={mean}
+                onChange={(e) => {
+                  const newMean = Math.max(0, Math.min(30, Number(e.target.value)));
+                  const deltaMean = newMean - mean;
+                  setMean(newMean);
+                  setMu(mu + deltaMean);
+                  setA(a + deltaMean);
+                  setB(b + deltaMean);
+                }}
+                className="border"
+                class="bg-blue-100 border border-blue-800 rounded px-2 py-1 w-16"
+              />
+            </div>
+            <div>
+              <label>True mean µ₁: </label>
+              <input
+                type="number"
+                min={mean - 3.0}
+                max={mean + 3.0}
+                step="0.01"
+                value={mu}
+                onChange={(e) => {
+                  const minMu = mean - 3.0;
+                  const maxMu = mean + 3.0;
+                  setMu(Math.max(minMu, Math.min(maxMu, Number(e.target.value))));
+                }}
+                className="border"
+                class="bg-red-100 border border-red-800 rounded px-2 py-1 w-16"
+              />
+            </div>
+          </div>
+          {/* Plot */}
+          <div>
+            <div id="plotly-div" ref={plotRef}></div>
+          </div>
+          {/* Informational Output */}
+          <div className="text-lg font-bold">
+            <div className={pval < alpha ? 'text-blue-500 font-bold' : 'text-red-500 font-bold'}>
+              {pval < alpha ? 'Reject' : 'Fail to Reject'} at significance level {alpha}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-1 my-0 text-lg font-bold">
+            <div>Null Hypothesis is H₀: µ = {mean}</div>
+            <div>Statistic = {((mu - mean) / (sigma / Math.sqrt(n))).toFixed(4)}</div> 
+            <div>Observed sample mean = {mu}</div>             
+            <div>(Two Tailed) p-value: {pval.toFixed(4)}</div>
+            <div>Power: {power.toFixed(4)}</div>
+            <div>Significance: {alpha}</div>
+         </div>
+<hr className="my-4" />
+
+<div className="text-right italic">
+  by Dr. B.Walter and ChatGPT
+</div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<HypothesisTestVisualization />, document.getElementById('root'));
+
+  </script>
+</body>
+</html>
