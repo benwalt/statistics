@@ -283,10 +283,12 @@ function updatePlot() {
   document.getElementById('base_r').innerText = base_r.toFixed(3);
   document.getElementById('base_r2').innerText = base_r2.toFixed(3);
   document.getElementById('base_F').innerText = base_F.toFixed(2);
-  if (base_p < .01) {
+  if ((base_p < .01) && (base_p != 0)) {
     document.getElementById('base_p').innerText = base_p.toExponential(2);
+  } else if (base_p == 0) {
+    document.getElementById('base_p').innerText = "< 1e-16";   
   } else {
-    document.getElementById('base_p').innerText = base_p.toFixed(2);   
+    document.getElementById('base_p').innerText = base_p.toFixed(2);  
   }
 
   document.getElementById('out_b0').innerText = out_b0.toFixed(2);
@@ -294,8 +296,10 @@ function updatePlot() {
   document.getElementById('out_r').innerText = out_r.toFixed(3);
   document.getElementById('out_r2').innerText = out_r2.toFixed(3);
   document.getElementById('out_F').innerText = out_F.toFixed(2);
-  if (out_p < .01) {
+  if ((out_p < .01) && (out_p != 0)) {
     document.getElementById('out_p').innerText = out_p.toExponential(2);
+  } else if (out_p == 0) {
+    document.getElementById('out_p').innerText = "< 1e-16";
   } else {
     document.getElementById('out_p').innerText = out_p.toFixed(2);
   }
